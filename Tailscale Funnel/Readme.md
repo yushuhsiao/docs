@@ -231,6 +231,54 @@ docker run -d --name=my-service-app --network=container:my-service-tailscale 你
 
 ---
 
+## 另一個用途：Tailnet 內部 HTTPS 服務
+
+如果你**不想公開到網際網路**，而是想讓 **Tailnet 內部成員**透過 HTTPS 存取服務，可以使用 `tailscale serve`。
+
+**與 Funnel 的差異**：
+- **Funnel**：公開網際網路可存取（任何人知道 URL 就能存取）
+- **Serve**：只有 Tailnet 內部成員能存取（需登入 Tailscale）
+
+### 在現有容器上加入 Tailscale
+
+如果你的應用程式容器已經在運行（例如 `my-service-app`），讓 Tailscale 使用應用程式的網路：
+
+**建立 start.sh**（不使用 funnel）：
+
+```bash
+#!/bin/sh
+tailscaled & 
+sleep 2 
+tailscale up
+tailscale serve status
+wait
+```
+
+**建立 Tailscale 容器**（共享應用程式的網路）：
+
+```bash
+# Windows
+docker run -d --name=my-service-tailscale --network=container:my-service-app --volume=D:\docker\tailscale:/var/lib/tailscale --volume=/dev/net/tun:/dev/net/tun --cap-add=NET_ADMIN --cap-add=SYS_MODULE --restart=always --entrypoint=/bin/sh tailscale/tailscale:latest -c "sh /var/lib/tailscale/start.sh"
+
+# Linux/Mac
+docker run -d --name=my-service-tailscale --network=container:my-service-app --volume=$HOME/docker/tailscale:/var/lib/tailscale --volume=/dev/net/tun:/dev/net/tun --cap-add=NET_ADMIN --cap-add=SYS_MODULE --restart=always --entrypoint=/bin/sh tailscale/tailscale:latest -c "sh /var/lib/tailscale/start.sh"
+```
+
+**註冊內部 HTTPS 服務**（只需執行一次）：
+
+```bash
+docker exec my-service-tailscale tailscale serve --bg http://localhost:5001
+```
+
+Tailnet 成員可透過 `https://my-service.taileXXXXX.ts.net/` 存取（需在本機登入 Tailscale）
+
+**停止服務**：
+```bash
+docker exec my-service-tailscale tailscale serve reset
+```
+
+---
+
 ## 快速檢查
 
 ```bash
